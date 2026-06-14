@@ -1,0 +1,17 @@
+{
+  "name": "texas-transcript-proofreader",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Texas transcript proofreading app with OpenAI API",
+  "scripts": {
+    "dev": "node --import tsx dev-server.mjs",
+    "test": "node --import tsx --test tests/**/*.test.ts"
+  },
+  "dependencies": {
+    "@vercel/node": "^5.5.16",
+    "openai": "^6.16.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
+  }
+}

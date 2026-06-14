@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Texas Transcript Proofreader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:wght@500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Header -->
+    <header class="site-header">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+            <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
+            <path d="M9 13l2 2 4-4" />
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>Texas Transcript Proofreader</h1>
+          <p>Court reporting proofreading &amp; scopist assistant</p>
+        </div>
+      </div>
+      <span class="badge-pill">OpenAI Proofread</span>
+    </header>
+
+    <main class="layout">
+      <!-- Left column: workflow -->
+      <section class="workflow">
+        <!-- Step 1: Upload -->
+        <div class="card" id="upload-card">
+          <div class="card-head">
+            <span class="step-chip">1</span>
+            <div>
+              <h2>Upload transcript</h2>
+              <p class="muted">Accepted: .docx, .pdf, .txt, .ascii</p>
+            </div>
+          </div>
+
+          <label class="dropzone" id="dropzone" tabindex="0">
+            <input id="file-input" type="file" accept=".docx,.pdf,.txt,.ascii" hidden />
+            <div class="dropzone-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <path d="M7 9l5-5 5 5" />
+                <path d="M12 4v12" />
+              </svg>
+            </div>
+            <div class="dropzone-text">
+              <strong>Click to choose a file</strong>
+              <span>or drag &amp; drop it here</span>
+            </div>
+          </label>
+
+          <div class="file-summary hidden" id="file-summary">
+            <div class="file-meta">
+              <span class="file-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                  <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
+                </svg>
+              </span>
+              <div>
+                <p class="file-name" id="file-name">No file</p>
+                <p class="file-sub muted" id="file-sub"></p>
+              </div>
+            </div>
+            <button type="button" class="link-btn" id="clear-file">Remove</button>
+          </div>
+        </div>
+
+        <!-- Step 2: Style -->
+        <div class="card">
+          <div class="card-head">
+            <span class="step-chip">2</span>
+            <div>
+              <h2>Select transcript style</h2>
+              <p class="muted">Determines which formatting rules will apply.</p>
+            </div>
+          </div>
+
+          <label class="field-label" for="style-select">Formatting style</label>
+          <div class="select-wrap">
+            <select id="style-select">
+              <option value="Texas UFM - Official Reporter">Texas UFM - Official Reporter</option>
+              <option value="Texas UFM - Deputy Reporter">Texas UFM - Deputy Reporter</option>
+              <option value="Texas UFM - Freelance Reporter">Texas UFM - Freelance Reporter</option>
+              <option value="General Proofreading">General Proofreading</option>
+              <option value="Do Not Reword Mode">Do Not Reword Mode</option>
+            </select>
+            <span class="select-arrow" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+            </span>
+          </div>
+          <p class="style-note muted" id="style-note"></p>
+        </div>
+
+        <!-- Step 3: Run -->
+        <div class="card run-card">
+          <div class="card-head">
+            <span class="step-chip">3</span>
+            <div>
+              <h2>Run the proofread</h2>
+              <p class="muted">Sends the transcript to OpenAI through the proxy for review.</p>
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary btn-run" id="run-btn" disabled>
+            <span class="btn-spinner" aria-hidden="true"></span>
+            <span class="btn-label">Run Proofread</span>
+          </button>
+          <p class="run-hint muted" id="run-hint">Upload a file to enable proofreading.</p>
+
+          <div class="cost-line hidden" id="cost-line">
+            <div class="cost-row">
+              <span class="cost-label">Document length</span>
+              <span class="cost-value" id="page-value">&mdash;</span>
+            </div>
+            <div class="cost-row cost-total">
+              <span class="cost-label">Estimated cost</span>
+              <span class="cost-value" id="cost-value">&mdash;</span>
+            </div>
+            <p class="cost-note muted" id="cost-note">Billed at $0.50 per page. No payment required for this test.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right column: results -->
+      <section class="results">
+        <!-- Empty state -->
+        <div class="card results-empty" id="results-empty">
+          <div class="empty-art" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+          </div>
+          <h3>Your results will appear here</h3>
+          <p class="muted">Upload a transcript, choose a style, then run proofreading to see suggested corrections.</p>
+        </div>
+
+        <!-- Result panel -->
+        <div class="results-content hidden" id="results-content">
+          <div class="card summary-card">
+            <div class="summary-banner">
+              <span class="summary-tag">Proofread Result</span>
+              <p id="summary-text"></p>
+            </div>
+            <div class="summary-stats">
+              <div class="stat">
+                <span class="stat-num" id="stat-total">0</span>
+                <span class="stat-label">Findings</span>
+              </div>
+              <div class="stat">
+                <span class="stat-num" id="stat-accepted">0</span>
+                <span class="stat-label">Accepted</span>
+              </div>
+              <div class="stat">
+                <span class="stat-num" id="stat-rejected">0</span>
+                <span class="stat-label">Rejected</span>
+              </div>
+              <div class="stat">
+                <span class="stat-num" id="stat-pending">0</span>
+                <span class="stat-label">Pending</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="results-toolbar">
+            <h2>Suggested corrections</h2>
+            <div class="toolbar-actions">
+              <button type="button" class="btn btn-soft" id="apply-safe-btn">Apply All Safe Fixes</button>
+              <button type="button" class="btn btn-outline" id="export-final-btn">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/><path d="M9 11h2"/></svg>
+                Export Final Transcript (PDF)
+              </button>
+            </div>
+          </div>
+
+          <div class="cards-list" id="cards-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Future features -->
+    <section class="card roadmap">
+      <div class="card-head">
+        <div>
+          <h2>On the roadmap</h2>
+          <p class="muted">Planned capabilities. Not active in this test build.</p>
+        </div>
+      </div>
+      <div class="roadmap-grid" id="roadmap-grid"></div>
+    </section>
+
+    <footer class="site-footer">
+      <p>Texas Transcript Proofreader &middot; Transcript text is sent to OpenAI via the proxy for proofreading.</p>
+    </footer>
+  </div>
+
+  <!-- Edit modal -->
+  <div class="modal-overlay hidden" id="edit-modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-title">
+      <h3 id="edit-title">Edit suggestion</h3>
+      <p class="muted" id="edit-location"></p>
+      <label class="field-label" for="edit-textarea">Suggested text</label>
+      <textarea id="edit-textarea" rows="3"></textarea>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="edit-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="edit-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
