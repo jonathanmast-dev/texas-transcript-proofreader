@@ -451,35 +451,44 @@ function saveEdit() {
 }
 
 function applyAcceptedCorrections(transcriptText, corrections) {
-  let result = transcriptText;
-  const accepted = corrections
-    .filter((c) => c.status === 'accepted')
-    .sort((a, b) => b.original.length - a.original.length);
+  const accepted = corrections.filter((c) => c.status === 'accepted');
+  if (!accepted.length) return transcriptText;
+
+  const pages = transcriptText.split('\f');
 
   accepted.forEach((correction) => {
-    if (correction.original && result.includes(correction.original)) {
-      result = result.replace(correction.original, correction.suggested);
+    const pageIdx = correction.page - 1;
+    if (pageIdx < 0 || pageIdx >= pages.length) return;
+
+    const lines = pages[pageIdx].split('\n');
+    const lineIdx = correction.line - 1;
+    if (lineIdx < 0 || lineIdx >= lines.length) return;
+
+    const line = lines[lineIdx];
+    if (correction.original && line.includes(correction.original)) {
+      lines[lineIdx] = line.replace(correction.original, correction.suggested);
+    } else if (correction.suggested) {
+      lines[lineIdx] = correction.suggested;
     }
+    pages[pageIdx] = lines.join('\n');
   });
+
+  let result = pages.join('\f');
+
+  // Fallback: replace any remaining accepted originals still in the text.
+  accepted
+    .sort((a, b) => b.original.length - a.original.length)
+    .forEach((correction) => {
+      if (correction.original && result.includes(correction.original)) {
+        result = result.replace(correction.original, correction.suggested);
+      }
+    });
 
   return result;
 }
 
-function buildFinalTranscriptText() {
-  const corrected = applyAcceptedCorrections(state.transcriptText, state.corrections);
-  const acceptedCount = state.corrections.filter((c) => c.status === 'accepted').length;
-  const header = [
-    'TEXAS TRANSCRIPT PROOFREADER — FINAL TRANSCRIPT',
-    `Source file: ${state.file ? state.file.name : '(none)'}`,
-    `Style: ${state.style}`,
-    `Generated: ${new Date().toLocaleString()}`,
-    `Corrections applied: ${acceptedCount} of ${state.corrections.length}`,
-    '',
-    '- - - - - - - - - - - - - - - - - - - - - - - - - -',
-    ''
-  ];
-
-  return header.join('\n') + corrected;
+function getCorrectedTranscriptText() {
+  return applyAcceptedCorrections(state.transcriptText, state.corrections);
 }
 
 function exportFinalTranscript() {
@@ -492,50 +501,38 @@ function exportFinalTranscript() {
     return;
   }
 
+  const finalText = getCorrectedTranscriptText();
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
-  const marginX = 60;
-  const marginTop = 64;
-  const lineHeight = 14;
+
+  const marginX = 72;
+  const marginTop = 72;
+  const marginBottom = 72;
+  const lineHeight = 12;
+  const fontSize = 10;
   const pageHeight = doc.internal.pageSize.getHeight();
-  const maxWidth = doc.internal.pageSize.getWidth() - marginX * 2;
+
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(fontSize);
+
   let y = marginTop;
+  const pages = finalText.split('\f');
 
-  const accepted = state.corrections.filter((c) => c.status === 'accepted').length;
-  const cost = (state.pages || 0) * PRICE_PER_PAGE;
-  const finalText = buildFinalTranscriptText();
+  pages.forEach((pageText, pageIndex) => {
+    if (pageIndex > 0) {
+      doc.addPage();
+      y = marginTop;
+    }
 
-  function writeLine(text, opts = {}) {
-    const size = opts.size || 10;
-    doc.setFont('courier', opts.font || 'normal');
-    doc.setFontSize(size);
-    const wrapped = doc.splitTextToSize(text || ' ', maxWidth);
-    wrapped.forEach((segment) => {
-      if (y > pageHeight - marginTop) {
+    pageText.split('\n').forEach((line) => {
+      if (y > pageHeight - marginBottom) {
         doc.addPage();
         y = marginTop;
       }
-      doc.text(segment, marginX, y);
+      doc.text(line === '' ? ' ' : line, marginX, y);
       y += lineHeight;
     });
-  }
-
-  doc.setFont('times', 'bold');
-  doc.setFontSize(16);
-  doc.text('TEXAS TRANSCRIPT PROOFREADER', marginX, y);
-  y += 22;
-  doc.setFont('times', 'italic');
-  doc.setFontSize(11);
-  doc.text('Final Transcript Export', marginX, y);
-  y += 24;
-
-  writeLine(`Generated:  ${new Date().toLocaleString()}`);
-  writeLine(`Pages:      ${state.pages != null ? state.pages : 'n/a'}${state.pagesEstimated ? ' (est.)' : ''}`);
-  writeLine(`Est. cost:  ${formatCurrency(cost)}  (at ${formatCurrency(PRICE_PER_PAGE)}/page)`);
-  writeLine(`Corrections applied: ${accepted} of ${state.corrections.length}`);
-  y += 8;
-
-  finalText.split('\n').forEach((line) => writeLine(line));
+  });
 
   const baseName = state.file ? state.file.name.replace(/\.[^.]+$/, '') : 'transcript';
   doc.save(`${baseName}_final.pdf`);
