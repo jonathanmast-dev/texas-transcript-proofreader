@@ -10,7 +10,6 @@ import {
 
 test("normalizeStyle accepts known styles and falls back safely", () => {
   assert.equal(normalizeStyle("Texas UFM - Official Reporter"), "Texas UFM - Official Reporter");
-  assert.equal(normalizeStyle("Do Not Reword Mode"), "Do Not Reword Mode");
   assert.equal(normalizeStyle("Unknown Style"), "General Proofreading");
 });
 

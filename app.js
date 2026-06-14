@@ -10,8 +10,7 @@ const STYLE_NOTES = {
   'Texas UFM - Official Reporter': 'Applies Texas Uniform Format Manual rules for official court reporters.',
   'Texas UFM - Deputy Reporter': 'Applies Texas UFM rules tuned for deputy reporter transcripts.',
   'Texas UFM - Freelance Reporter': 'Applies Texas UFM rules for freelance / deposition work.',
-  'General Proofreading': 'Standard punctuation, spelling, and capitalization checks.',
-  'Do Not Reword Mode': 'Flags only mechanical errors; never changes wording or content.'
+  'General Proofreading': 'Standard punctuation, spelling, and capitalization checks.'
 };
 
 const ROADMAP = [

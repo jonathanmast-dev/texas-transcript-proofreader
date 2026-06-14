@@ -31,7 +31,6 @@ const ALLOWED_STYLES = new Set([
   "Texas UFM - Deputy Reporter",
   "Texas UFM - Freelance Reporter",
   "General Proofreading",
-  "Do Not Reword Mode",
 ]);
 
 const MAX_TRANSCRIPT_CHARS = 60000;
@@ -66,11 +65,6 @@ export function buildStyleRules(style: string): string {
       return `Apply Texas UFM rules for freelance/deposition work:
 - Correct deposition Q/A formatting, speaker labels, and Texas-specific style.
 - Flag formatting inconsistencies common in freelance transcripts.`;
-    case "Do Not Reword Mode":
-      return `Do NOT reword content. Flag only mechanical errors:
-- Fix capitalization, punctuation, spelling, apostrophes, and obvious typos.
-- Do NOT change meaning, word choice, or sentence structure unless required to fix a mechanical error.
-- Mark substantive reword suggestions as safe: false.`;
     default:
       return `Apply general proofreading standards:
 - Correct capitalization, punctuation, spelling, apostrophes, and obvious typos.
@@ -105,6 +99,7 @@ SOURCE:
 - Estimated pages: ${pages ?? "unknown"}
 
 GLOBAL RULES:
+- Do NOT reword content. Transcripts must stay precise — fix only mechanical errors (capitalization, punctuation, spelling, apostrophes, formatting). Never change meaning or word choice.
 - Identify real issues present in the transcript text.
 - Each correction must reference a plausible page and line number based on the transcript layout.
 - "original" must be an exact substring from the transcript (copy verbatim).
