@@ -128,10 +128,43 @@ async function extractPdfText(file) {
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    const pageText = content.items.map((item) => item.str).join(' ');
-    pages.push(pageText.trim());
+    pages.push(groupPdfItemsIntoLines(content.items).join('\n'));
   }
   return pages.join('\f');
+}
+
+function groupPdfItemsIntoLines(items) {
+  const rows = new Map();
+  items.forEach((item) => {
+    if (!item.str) return;
+    const y = Math.round(item.transform[5]);
+    if (!rows.has(y)) rows.set(y, []);
+    rows.get(y).push({ x: item.transform[4], text: item.str });
+  });
+
+  return [...rows.keys()]
+    .sort((a, b) => b - a)
+    .map((y) =>
+      rows
+        .get(y)
+        .sort((a, b) => a.x - b.x)
+        .map((part) => part.text)
+        .join('')
+        .trimEnd()
+    )
+    .filter((line) => line.length > 0);
+}
+
+function downloadTextFile(content, filename) {
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 async function extractDocxText(file) {
@@ -491,51 +524,69 @@ function getCorrectedTranscriptText() {
   return applyAcceptedCorrections(state.transcriptText, state.corrections);
 }
 
+function writeCorrectedTextToPdf(text) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const marginX = 72;
+  const marginTop = 72;
+  const marginBottom = 72;
+  const lineHeight = 12;
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(10);
+
+  let y = marginTop;
+  const sourcePages = text.split('\f');
+
+  sourcePages.forEach((section, sectionIndex) => {
+    if (sectionIndex > 0) {
+      doc.addPage();
+      y = marginTop;
+    }
+
+    section.split('\n').forEach((line) => {
+      if (y + lineHeight > pageHeight - marginBottom) {
+        doc.addPage();
+        y = marginTop;
+      }
+      doc.text(line.length ? line : ' ', marginX, y);
+      y += lineHeight;
+    });
+  });
+
+  return doc;
+}
+
 function exportFinalTranscript() {
-  if (!state.transcriptText) {
+  if (!state.transcriptText || !state.file) {
     showToast('Upload a transcript before exporting');
     return;
   }
+
+  const finalText = getCorrectedTranscriptText();
+  const ext = getExtension(state.file.name);
+  const baseName = state.file.name.replace(/\.[^.]+$/, '');
+
+  // Text uploads: export the corrected file in the same format — exact layout preserved.
+  if (ext === 'txt' || ext === 'ascii') {
+    downloadTextFile(finalText, `${baseName}_final.${ext}`);
+    showToast('Final transcript exported');
+    return;
+  }
+
+  if (ext === 'docx') {
+    downloadTextFile(finalText, `${baseName}_final.txt`);
+    showToast('Final transcript exported');
+    return;
+  }
+
   if (!window.jspdf || !window.jspdf.jsPDF) {
     showToast('PDF library not loaded. Check your connection and retry.');
     return;
   }
 
-  const finalText = getCorrectedTranscriptText();
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
-
-  const marginX = 72;
-  const marginTop = 72;
-  const marginBottom = 72;
-  const lineHeight = 12;
-  const fontSize = 10;
-  const pageHeight = doc.internal.pageSize.getHeight();
-
-  doc.setFont('courier', 'normal');
-  doc.setFontSize(fontSize);
-
-  let y = marginTop;
-  const pages = finalText.split('\f');
-
-  pages.forEach((pageText, pageIndex) => {
-    if (pageIndex > 0) {
-      doc.addPage();
-      y = marginTop;
-    }
-
-    pageText.split('\n').forEach((line) => {
-      if (y > pageHeight - marginBottom) {
-        doc.addPage();
-        y = marginTop;
-      }
-      doc.text(line === '' ? ' ' : line, marginX, y);
-      y += lineHeight;
-    });
-  });
-
-  const baseName = state.file ? state.file.name.replace(/\.[^.]+$/, '') : 'transcript';
-  doc.save(`${baseName}_final.pdf`);
+  writeCorrectedTextToPdf(finalText).save(`${baseName}_final.pdf`);
   showToast('Final transcript exported (PDF)');
 }
 
