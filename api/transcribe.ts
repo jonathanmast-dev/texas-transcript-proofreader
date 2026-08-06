@@ -34,6 +34,9 @@ export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 // Legacy direct-upload fallback for local dev (Vercel request body limit).
 export const LEGACY_BASE64_MAX_BYTES = 4 * 1024 * 1024;
 
+// Longer transcripts skip the LLM formatting pass to stay within function time limits.
+export const LLM_FORMAT_MAX_CHARS = 8000;
+
 export function getExtension(filename: string): string {
   const parts = filename.split(".");
   return parts.length > 1 ? parts.pop()!.toLowerCase() : "";
@@ -76,6 +79,10 @@ export function setCorsHeaders(res: VercelResponse): void {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
+export function shouldUseLlmFormatting(rawTranscript: string): boolean {
+  return rawTranscript.length <= LLM_FORMAT_MAX_CHARS;
+}
+
 export async function formatTranscriptWithLLM(openai: OpenAI, rawTranscript: string): Promise<string> {
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
@@ -84,6 +91,13 @@ export async function formatTranscriptWithLLM(openai: OpenAI, rawTranscript: str
 
   const formatted = completion.choices[0]?.message?.content?.trim();
   return formatted || formatTranscriptLines(rawTranscript);
+}
+
+export async function formatTranscriptForOutput(openai: OpenAI, rawTranscript: string): Promise<string> {
+  if (!shouldUseLlmFormatting(rawTranscript)) {
+    return formatTranscriptLines(rawTranscript);
+  }
+  return formatTranscriptWithLLM(openai, rawTranscript);
 }
 
 export async function loadAudioBuffer(body: TranscribeRequestBody): Promise<{
@@ -173,7 +187,7 @@ export async function handleTranscribeRequest(
       return res.status(500).json({ error: "No speech detected in this file" });
     }
 
-    const formattedTranscript = await formatTranscriptWithLLM(openai, rawTranscript);
+    const formattedTranscript = await formatTranscriptForOutput(openai, rawTranscript);
     const baseName = audio.filename.replace(/\.[^.]+$/, "") || "audio";
 
     if (blobUrl) {
@@ -205,5 +219,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 export const config = {
-  maxDuration: 120,
+  maxDuration: 800,
 };
