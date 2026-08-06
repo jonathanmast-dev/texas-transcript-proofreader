@@ -1,5 +1,3 @@
-import { upload } from "https://esm.sh/@vercel/blob@2.6.1/client";
-
 const ACCEPTED_AUDIO_EXTENSIONS = [
   "mp3", "mp4", "mpeg", "mpga", "m4a", "wav", "webm", "ogg", "mov", "avi", "mkv",
 ];
@@ -86,9 +84,15 @@ function downloadTextFile(content, filename) {
   URL.revokeObjectURL(url);
 }
 
+async function loadBlobUploadClient() {
+  const mod = await import("https://esm.sh/@vercel/blob@2.6.1/client");
+  return mod.upload;
+}
+
 async function prepareAudioPayload(file) {
   try {
     els.transcribeBtn.querySelector(".btn-label").textContent = "Uploading…";
+    const upload = await loadBlobUploadClient();
     const blob = await upload(file.name, file, {
       access: "public",
       handleUploadUrl: getUploadAudioUrl(),
@@ -221,7 +225,7 @@ function downloadTranscript() {
 }
 
 function initTranscriber() {
-  if (!els.audioDropzone) return;
+  if (!els.audioDropzone || !els.audioInput) return;
 
   updateTranscribeState();
 
@@ -230,14 +234,6 @@ function initTranscriber() {
   els.transcribeBtn.addEventListener("click", runTranscription);
   els.downloadTranscriptBtn.addEventListener("click", downloadTranscript);
 
-  els.audioDropzone.addEventListener("click", () => els.audioInput.click());
-  els.audioDropzone.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      els.audioInput.click();
-    }
-  });
-
   ["dragenter", "dragover"].forEach((evt) =>
     els.audioDropzone.addEventListener(evt, (e) => {
       e.preventDefault();
@@ -245,14 +241,15 @@ function initTranscriber() {
       els.audioDropzone.classList.add("dragover");
     })
   );
-  ["dragleave", "drop"].forEach((evt) =>
-    els.audioDropzone.addEventListener(evt, (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      els.audioDropzone.classList.remove("dragover");
-    })
-  );
+  els.audioDropzone.addEventListener("dragleave", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    els.audioDropzone.classList.remove("dragover");
+  });
   els.audioDropzone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    els.audioDropzone.classList.remove("dragover");
     const file = e.dataTransfer.files && e.dataTransfer.files[0];
     handleAudioFile(file);
   });

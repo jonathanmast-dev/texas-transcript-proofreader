@@ -617,15 +617,6 @@ function init() {
   els.fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
   els.clearFile.addEventListener('click', clearFile);
 
-  els.dropzone.addEventListener('click', () => els.fileInput.click());
-
-  els.dropzone.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      els.fileInput.click();
-    }
-  });
-
   ['dragenter', 'dragover'].forEach((evt) =>
     els.dropzone.addEventListener(evt, (e) => {
       e.preventDefault();
@@ -633,14 +624,15 @@ function init() {
       els.dropzone.classList.add('dragover');
     })
   );
-  ['dragleave', 'drop'].forEach((evt) =>
-    els.dropzone.addEventListener(evt, (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      els.dropzone.classList.remove('dragover');
-    })
-  );
+  els.dropzone.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    els.dropzone.classList.remove('dragover');
+  });
   els.dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    els.dropzone.classList.remove('dragover');
     const file = e.dataTransfer.files && e.dataTransfer.files[0];
     handleFile(file);
   });
