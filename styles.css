@@ -56,7 +56,52 @@ p { margin: 0; }
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+}
+
+.app-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 22px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+.app-tab {
+  flex: 1;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  padding: 11px 16px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+
+.app-tab:hover { background: var(--surface-soft); color: var(--text); }
+.app-tab.active {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+
+.transcript-preview-card { padding: 0; overflow: hidden; }
+.transcript-preview {
+  margin: 0;
+  padding: 20px 22px;
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 520px;
+  overflow: auto;
+  background: var(--surface-soft);
 }
 .brand { display: flex; align-items: center; gap: 14px; }
 .brand-mark {
