@@ -1,7 +1,10 @@
+import { upload } from "https://esm.sh/@vercel/blob@2.6.1/client";
+
 const ACCEPTED_AUDIO_EXTENSIONS = [
   "mp3", "mp4", "mpeg", "mpga", "m4a", "wav", "webm", "ogg", "mov", "avi", "mkv",
 ];
-const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+const LEGACY_BASE64_MAX_BYTES = 4 * 1024 * 1024;
 
 const state = {
   file: null,
@@ -29,6 +32,10 @@ const els = {
 
 function getTranscribeUrl() {
   return (window.APP_CONFIG && window.APP_CONFIG.TRANSCRIBE_URL) || "/api/transcribe";
+}
+
+function getUploadAudioUrl() {
+  return (window.APP_CONFIG && window.APP_CONFIG.UPLOAD_AUDIO_URL) || "/api/upload-audio";
 }
 
 function getExtension(name) {
@@ -79,6 +86,31 @@ function downloadTextFile(content, filename) {
   URL.revokeObjectURL(url);
 }
 
+async function prepareAudioPayload(file) {
+  try {
+    els.transcribeBtn.querySelector(".btn-label").textContent = "Uploading…";
+    const blob = await upload(file.name, file, {
+      access: "public",
+      handleUploadUrl: getUploadAudioUrl(),
+    });
+    return {
+      blobUrl: blob.url,
+      filename: file.name,
+      mimeType: file.type || "application/octet-stream",
+    };
+  } catch (err) {
+    if (file.size <= LEGACY_BASE64_MAX_BYTES) {
+      console.warn("Blob upload unavailable, using legacy upload:", err);
+      return {
+        audioBase64: await readFileAsBase64(file),
+        filename: file.name,
+        mimeType: file.type || "application/octet-stream",
+      };
+    }
+    throw new Error("Upload failed. For files over 4 MB, configure Vercel Blob storage.");
+  }
+}
+
 function updateTranscribeState() {
   const ready = Boolean(state.file) && !state.isRunning;
   els.transcribeBtn.disabled = !ready;
@@ -108,7 +140,7 @@ function handleAudioFile(file) {
   }
 
   if (file.size > MAX_AUDIO_BYTES) {
-    showToast("File too large. Max 4 MB for this build.");
+    showToast("File too large. Max 25 MB.");
     return;
   }
 
@@ -142,29 +174,27 @@ async function runTranscription() {
 
   state.isRunning = true;
   els.transcribeBtn.classList.add("is-loading");
-  els.transcribeBtn.querySelector(".btn-label").textContent = "Transcribing…";
+  els.transcribeBtn.querySelector(".btn-label").textContent = "Uploading…";
   updateTranscribeState();
 
   try {
-    const audioBase64 = await readFileAsBase64(state.file);
+    const payload = await prepareAudioPayload(state.file);
+    els.transcribeBtn.querySelector(".btn-label").textContent = "Transcribing…";
+
     const response = await fetch(getTranscribeUrl(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        audioBase64,
-        filename: state.file.name,
-        mimeType: state.file.type || "application/octet-stream",
-      }),
+      body: JSON.stringify(payload),
     });
 
-    const payload = await response.json().catch(() => ({}));
+    const result = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(payload.error || "Transcription request failed");
+      throw new Error(result.error || "Transcription request failed");
     }
 
-    state.transcript = typeof payload.transcript === "string" ? payload.transcript : "";
+    state.transcript = typeof result.transcript === "string" ? result.transcript : "";
     state.downloadName =
-      typeof payload.downloadName === "string" ? payload.downloadName : "transcript.txt";
+      typeof result.downloadName === "string" ? result.downloadName : "transcript.txt";
 
     if (!state.transcript) {
       throw new Error("No transcript returned");
