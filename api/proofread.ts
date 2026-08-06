@@ -145,7 +145,9 @@ export function normalizeCorrection(raw: unknown, index: number): ProofreadCorre
   const page = Number(item.page);
   const line = Number(item.line);
   const issues = Array.isArray(item.issues)
-    ? item.issues.filter((issue): issue is string => typeof issue === "string" && issue.trim()).slice(0, 8)
+    ? item.issues
+        .filter((issue): issue is string => typeof issue === "string" && issue.trim().length > 0)
+        .slice(0, 8)
     : [];
 
   return {
