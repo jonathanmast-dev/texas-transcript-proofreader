@@ -6,7 +6,9 @@ import {
   getExtension,
   isAcceptedAudioFile,
   LEGACY_BASE64_MAX_BYTES,
+  LLM_FORMAT_MAX_CHARS,
   MAX_AUDIO_BYTES,
+  shouldUseLlmFormatting,
 } from "../api/transcribe.ts";
 
 test("isAcceptedAudioFile accepts common audio and video containers", () => {
@@ -33,4 +35,11 @@ test("buildFormatPrompt includes verbatim formatting rules", () => {
 test("MAX_AUDIO_BYTES matches OpenAI limit", () => {
   assert.equal(MAX_AUDIO_BYTES, 25 * 1024 * 1024);
   assert.ok(LEGACY_BASE64_MAX_BYTES < MAX_AUDIO_BYTES);
+});
+
+test("shouldUseLlmFormatting skips long transcripts", () => {
+  const short = "a".repeat(LLM_FORMAT_MAX_CHARS);
+  const long = "a".repeat(LLM_FORMAT_MAX_CHARS + 1);
+  assert.equal(shouldUseLlmFormatting(short), true);
+  assert.equal(shouldUseLlmFormatting(long), false);
 });
