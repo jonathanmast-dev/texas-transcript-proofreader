@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  ACCEPTED_AUDIO_EXTENSIONS,
   buildFormatPrompt,
   formatTranscriptLines,
   getExtension,
   isAcceptedAudioFile,
+  LEGACY_BASE64_MAX_BYTES,
   MAX_AUDIO_BYTES,
 } from "../api/transcribe.ts";
 
@@ -30,7 +30,7 @@ test("buildFormatPrompt includes verbatim formatting rules", () => {
   assert.match(prompt, /Q\. What is your name\?/);
 });
 
-test("MAX_AUDIO_BYTES stays under vercel payload limit", () => {
-  assert.ok(MAX_AUDIO_BYTES <= 4.5 * 1024 * 1024);
-  assert.ok(ACCEPTED_AUDIO_EXTENSIONS.has("mp3"));
+test("MAX_AUDIO_BYTES matches OpenAI limit", () => {
+  assert.equal(MAX_AUDIO_BYTES, 25 * 1024 * 1024);
+  assert.ok(LEGACY_BASE64_MAX_BYTES < MAX_AUDIO_BYTES);
 });

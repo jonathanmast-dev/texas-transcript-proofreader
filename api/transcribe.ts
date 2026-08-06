@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import OpenAI from "openai";
+import { del } from "@vercel/blob";
 import { toFile } from "openai/uploads";
 
 function getOpenAIClient(): OpenAI {
@@ -7,6 +8,7 @@ function getOpenAIClient(): OpenAI {
 }
 
 export type TranscribeRequestBody = {
+  blobUrl?: string;
   audioBase64?: string;
   filename?: string;
   mimeType?: string;
@@ -26,8 +28,11 @@ export const ACCEPTED_AUDIO_EXTENSIONS = new Set([
   "mkv",
 ]);
 
-// Keep under Vercel's request body limit (~4.5 MB).
-export const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
+// OpenAI Whisper limit.
+export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+
+// Legacy direct-upload fallback for local dev (Vercel request body limit).
+export const LEGACY_BASE64_MAX_BYTES = 4 * 1024 * 1024;
 
 export function getExtension(filename: string): string {
   const parts = filename.split(".");
@@ -81,6 +86,53 @@ export async function formatTranscriptWithLLM(openai: OpenAI, rawTranscript: str
   return formatted || formatTranscriptLines(rawTranscript);
 }
 
+export async function loadAudioBuffer(body: TranscribeRequestBody): Promise<{
+  buffer: Buffer;
+  filename: string;
+  mimeType: string;
+  blobUrl?: string;
+}> {
+  const filename = typeof body.filename === "string" ? body.filename.trim() : "audio.mp3";
+  const mimeType = typeof body.mimeType === "string" ? body.mimeType : "application/octet-stream";
+  const blobUrl = typeof body.blobUrl === "string" ? body.blobUrl.trim() : "";
+  const audioBase64 = typeof body.audioBase64 === "string" ? body.audioBase64.trim() : "";
+
+  if (!isAcceptedAudioFile(filename)) {
+    throw new Error("Unsupported audio file type");
+  }
+
+  if (blobUrl) {
+    const response = await fetch(blobUrl);
+    if (!response.ok) {
+      throw new Error("Failed to fetch uploaded audio");
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (!buffer.length) throw new Error("Audio file is empty");
+    if (buffer.length > MAX_AUDIO_BYTES) {
+      throw new Error(`Audio file exceeds ${Math.round(MAX_AUDIO_BYTES / (1024 * 1024))} MB limit`);
+    }
+    return { buffer, filename, mimeType, blobUrl };
+  }
+
+  if (audioBase64) {
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(audioBase64, "base64");
+    } catch {
+      throw new Error("Invalid audio data");
+    }
+    if (!buffer.length) throw new Error("Audio file is empty");
+    if (buffer.length > LEGACY_BASE64_MAX_BYTES) {
+      throw new Error(
+        `Files over ${Math.round(LEGACY_BASE64_MAX_BYTES / (1024 * 1024))} MB must use blob upload`
+      );
+    }
+    return { buffer, filename, mimeType };
+  }
+
+  throw new Error("blobUrl or audioBase64 is required");
+}
+
 export async function handleTranscribeRequest(
   req: Pick<VercelRequest, "method" | "body">,
   res: VercelResponse
@@ -100,38 +152,14 @@ export async function handleTranscribeRequest(
   }
 
   const body = (req.body || {}) as TranscribeRequestBody;
-  const filename = typeof body.filename === "string" ? body.filename.trim() : "audio.mp3";
-  const mimeType = typeof body.mimeType === "string" ? body.mimeType : "application/octet-stream";
-  const audioBase64 = typeof body.audioBase64 === "string" ? body.audioBase64.trim() : "";
-
-  if (!audioBase64) {
-    return res.status(400).json({ error: "audioBase64 is required" });
-  }
-
-  if (!isAcceptedAudioFile(filename)) {
-    return res.status(400).json({ error: "Unsupported audio file type" });
-  }
-
-  let audioBuffer: Buffer;
-  try {
-    audioBuffer = Buffer.from(audioBase64, "base64");
-  } catch {
-    return res.status(400).json({ error: "Invalid audio data" });
-  }
-
-  if (!audioBuffer.length) {
-    return res.status(400).json({ error: "Audio file is empty" });
-  }
-
-  if (audioBuffer.length > MAX_AUDIO_BYTES) {
-    return res.status(400).json({
-      error: `Audio file exceeds ${Math.round(MAX_AUDIO_BYTES / (1024 * 1024))} MB limit for this build`,
-    });
-  }
+  let blobUrl: string | undefined;
 
   try {
+    const audio = await loadAudioBuffer(body);
+    blobUrl = audio.blobUrl;
+
     const openai = getOpenAIClient();
-    const uploadFile = await toFile(audioBuffer, filename, { type: mimeType });
+    const uploadFile = await toFile(audio.buffer, audio.filename, { type: audio.mimeType });
 
     const transcription = await openai.audio.transcriptions.create({
       file: uploadFile,
@@ -139,13 +167,22 @@ export async function handleTranscribeRequest(
       response_format: "text",
     });
 
-    const rawTranscript = typeof transcription === "string" ? transcription.trim() : String(transcription).trim();
+    const rawTranscript =
+      typeof transcription === "string" ? transcription.trim() : String(transcription).trim();
     if (!rawTranscript) {
       return res.status(500).json({ error: "No speech detected in this file" });
     }
 
     const formattedTranscript = await formatTranscriptWithLLM(openai, rawTranscript);
-    const baseName = filename.replace(/\.[^.]+$/, "") || "audio";
+    const baseName = audio.filename.replace(/\.[^.]+$/, "") || "audio";
+
+    if (blobUrl) {
+      try {
+        await del(blobUrl);
+      } catch (cleanupErr) {
+        console.warn("blob cleanup failed:", cleanupErr);
+      }
+    }
 
     return res.status(200).json({
       transcript: formattedTranscript,
@@ -155,7 +192,11 @@ export async function handleTranscribeRequest(
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("transcribe error:", message);
-    return res.status(500).json({ error: "Transcription failed" });
+    return res.status(message.includes("required") || message.includes("Unsupported") ? 400 : 500).json({
+      error: message.includes("Failed") || message.includes("exceeds") || message.includes("required")
+        ? message
+        : "Transcription failed",
+    });
   }
 }
 
