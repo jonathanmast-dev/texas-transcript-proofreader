@@ -7,6 +7,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = __dirname;
 const port = Number(process.env.PORT || 8000);
 
+const API_ROUTES = {
+  "/api/proofread": "proofread.ts",
+  "/api/transcribe": "transcribe.ts",
+};
+
 function loadDotEnv() {
   const envPath = path.join(rootDir, ".env");
   if (!fs.existsSync(envPath)) return;
@@ -51,10 +56,13 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-async function loadProofreadHandler() {
-  const modulePath = path.join(rootDir, "api", "proofread.ts");
+async function loadApiHandler(filename) {
+  const modulePath = path.join(rootDir, "api", filename);
   const imported = await import(pathToFileURL(modulePath).href);
-  return imported.handleProofreadRequest;
+  const handlerName = filename.startsWith("proofread")
+    ? "handleProofreadRequest"
+    : "handleTranscribeRequest";
+  return imported[handlerName];
 }
 
 function createMockResponse(res) {
@@ -78,8 +86,9 @@ function createMockResponse(res) {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host}`);
+  const apiFile = API_ROUTES[url.pathname];
 
-  if (req.method === "OPTIONS" && url.pathname === "/api/proofread") {
+  if (req.method === "OPTIONS" && apiFile) {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -89,15 +98,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (url.pathname === "/api/proofread" && req.method === "POST") {
+  if (apiFile && req.method === "POST") {
     try {
-      const handleProofreadRequest = await loadProofreadHandler();
+      const handler = await loadApiHandler(apiFile);
       const rawBody = await readBody(req);
       const body = rawBody ? JSON.parse(rawBody) : {};
-      await handleProofreadRequest({ method: req.method, body }, createMockResponse(res));
+      await handler({ method: req.method, body }, createMockResponse(res));
     } catch (err) {
-      console.error("dev-server proofread error:", err);
-      sendJson(res, 500, { error: "Proofread failed" });
+      console.error(`dev-server ${url.pathname} error:`, err);
+      sendJson(res, 500, { error: "Request failed" });
     }
     return;
   }
@@ -126,5 +135,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(port, () => {
   console.log(`Dev server: http://localhost:${port}`);
-  console.log(`API: http://localhost:${port}/api/proofread`);
+  console.log(`API: /api/proofread, /api/transcribe`);
 });

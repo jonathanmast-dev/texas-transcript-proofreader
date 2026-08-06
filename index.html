@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Texas Transcript Proofreader</title>
+  <title>Texas Transcript Tools</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:wght@500;600&display=swap" rel="stylesheet" />
@@ -22,13 +22,18 @@
           </svg>
         </div>
         <div class="brand-text">
-          <h1>Texas Transcript Proofreader</h1>
-          <p>Court reporting proofreading &amp; scopist assistant</p>
+          <h1>Texas Transcript Tools</h1>
+          <p>Court reporting proofreading &amp; transcription</p>
         </div>
       </div>
-      <span class="badge-pill">OpenAI Proofread</span>
     </header>
 
+    <nav class="app-tabs" aria-label="Main">
+      <button type="button" class="app-tab active" data-page="proofreader" aria-selected="true">Proofreader</button>
+      <button type="button" class="app-tab" data-page="transcriber" aria-selected="false">Audio Transcriber</button>
+    </nav>
+
+    <div class="app-page" data-page="proofreader">
     <main class="layout">
       <!-- Left column: workflow -->
       <section class="workflow">
@@ -197,8 +202,113 @@
     </section>
 
     <footer class="site-footer">
-      <p>Texas Transcript Proofreader &middot; Transcript text is sent to OpenAI via the proxy for proofreading.</p>
+      <p>Texas Transcript Tools &middot; Files are sent to OpenAI via the server API for processing.</p>
     </footer>
+    </div>
+
+    <div class="app-page hidden" data-page="transcriber">
+      <main class="layout layout-transcriber">
+        <section class="workflow">
+          <div class="card">
+            <div class="card-head">
+              <span class="step-chip">1</span>
+              <div>
+                <h2>Upload audio</h2>
+                <p class="muted">Accepted: mp3, mp4, m4a, wav, webm, ogg, mov, and more (max 4 MB)</p>
+              </div>
+            </div>
+
+            <label class="dropzone" id="audio-dropzone" tabindex="0">
+              <input id="audio-input" type="file" accept=".mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,.ogg,.mov,.avi,.mkv,audio/*,video/*" hidden />
+              <div class="dropzone-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+                  <path d="M12 18v4" />
+                  <path d="M8 22h8" />
+                </svg>
+              </div>
+              <div class="dropzone-text">
+                <strong>Click to choose an audio or video file</strong>
+                <span>or drag &amp; drop it here</span>
+              </div>
+            </label>
+
+            <div class="file-summary hidden" id="audio-summary">
+              <div class="file-meta">
+                <span class="file-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                  </svg>
+                </span>
+                <div>
+                  <p class="file-name" id="audio-name">No file</p>
+                  <p class="file-sub muted" id="audio-sub"></p>
+                </div>
+              </div>
+              <button type="button" class="link-btn" id="clear-audio">Remove</button>
+            </div>
+          </div>
+
+          <div class="card run-card">
+            <div class="card-head">
+              <span class="step-chip">2</span>
+              <div>
+                <h2>Run transcription</h2>
+                <p class="muted">Transcribes verbatim, then formats one sentence or speaker per line.</p>
+              </div>
+            </div>
+            <button type="button" class="btn btn-primary btn-run" id="transcribe-btn" disabled>
+              <span class="btn-spinner" aria-hidden="true"></span>
+              <span class="btn-label">Run Transcription</span>
+            </button>
+            <p class="run-hint muted" id="transcribe-hint">Upload an audio file to enable transcription.</p>
+          </div>
+        </section>
+
+        <section class="results">
+          <div class="card results-empty" id="transcribe-empty">
+            <div class="empty-art" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+              </svg>
+            </div>
+            <h3>Your transcript will appear here</h3>
+            <p class="muted">Upload audio, run transcription, then download a formatted .txt file.</p>
+          </div>
+
+          <div class="results-content hidden" id="transcribe-result">
+            <div class="card summary-card">
+              <div class="summary-banner">
+                <span class="summary-tag">Transcript Ready</span>
+                <p>Verbatim transcription with simple line formatting. Download as .txt below.</p>
+              </div>
+            </div>
+
+            <div class="results-toolbar">
+              <h2>Formatted transcript</h2>
+              <div class="toolbar-actions">
+                <button type="button" class="btn btn-outline" id="download-transcript-btn" disabled>
+                  Download .txt
+                </button>
+              </div>
+            </div>
+
+            <div class="card transcript-preview-card">
+              <pre class="transcript-preview" id="transcript-preview"></pre>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <p>Audio is sent to OpenAI Whisper for transcription, then lightly formatted for download.</p>
+      </footer>
+    </div>
+
   </div>
 
   <!-- Edit modal -->
@@ -221,6 +331,8 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="config.js"></script>
+  <script src="nav.js"></script>
   <script src="app.js"></script>
+  <script src="transcriber.js"></script>
 </body>
 </html>
